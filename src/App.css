@@ -1,134 +1,345 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@700;800;900&family=Inter:wght@400;500;600;700&display=swap");
+
+* {
+  box-sizing: border-box;
+}
+
 :root {
-  font-family: "Segoe UI", "Trebuchet MS", sans-serif;
-  font-size: 16px;
-  line-height: 1.45;
-  font-weight: 400;
-
-  color: #11202f;
-  background: linear-gradient(135deg, #e7f0ea 0%, #f2e8da 100%);
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  -webkit-text-size-adjust: 100%;
+  font-family: "Inter", "Segoe UI", sans-serif;
+  color: #e5e2e1;
+  background: #131313;
 }
 
-.container {
-  margin: 0 auto;
-  max-width: 860px;
+body {
+  margin: 0;
   min-height: 100vh;
-  padding: 3rem 1rem;
+  background: radial-gradient(circle at 20% -10%, #4c0a09 0%, #131313 45%);
+}
+
+.splash-root {
+  position: relative;
+  min-height: 100vh;
   display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
+  background: #0e0e0e;
+  overflow: hidden;
 }
 
-.card {
-  width: 100%;
-  background: #ffffffd6;
-  border: 1px solid #b8c7d1;
-  border-radius: 16px;
-  box-shadow: 0 20px 35px rgba(17, 32, 47, 0.12);
-  padding: 1.5rem;
+.splash-grid {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.038) 1px, transparent 1px);
+  background-size: 28px 28px;
 }
 
-h1 {
-  margin: 0 0 0.3rem;
-  font-size: 2rem;
+.splash-glow {
+  position: absolute;
+  width: 500px;
+  height: 500px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(192, 1, 0, 0.23) 0%, transparent 68%);
+  transform: translateY(-28px);
 }
 
-.subtitle {
-  margin: 0 0 1.2rem;
-  color: #3d556e;
+.splash-logo-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 1;
+  animation: fade-up 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-label {
-  display: block;
-  margin: 0.9rem 0 0.4rem;
-  font-weight: 600;
+.splash-logo-stark {
+  font-family: "Manrope", sans-serif;
+  font-size: clamp(2.2rem, 7vw, 4rem);
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: -3px;
 }
 
-input,
-button {
+.splash-logo-pill {
+  font-family: "Manrope", sans-serif;
+  font-size: clamp(1.75rem, 5vw, 3.1rem);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 1px;
+  border-radius: 14px;
+  padding: 0.3rem 0.95rem;
+  background: linear-gradient(145deg, #c00100 0%, #ff2200 100%);
+  box-shadow: 0 6px 36px rgba(192, 1, 0, 0.55);
+}
+
+.splash-tagline {
+  margin-top: 14px;
+  font-size: 0.68rem;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: rgba(235, 187, 180, 0.55);
+  z-index: 1;
+}
+
+.splash-loader-wrap {
+  margin-top: 42px;
+  width: 220px;
+  z-index: 1;
+}
+
+.splash-loader-bg {
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.splash-loader-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #c00100, #ff5540, #ffb4a8);
+  box-shadow: 0 0 12px rgba(255, 85, 64, 0.7);
+  transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.splash-status {
+  margin: 9px 0 0;
+  font-size: 0.63rem;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: rgba(235, 187, 180, 0.4);
+  text-align: center;
+}
+
+.app-root {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 1.2rem;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  padding: 0.9rem 0.2rem;
+  backdrop-filter: blur(10px);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand-stark {
+  font-family: "Manrope", sans-serif;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: -1px;
+  color: #ffcec4;
+}
+
+.brand-pill {
+  font-family: "Manrope", sans-serif;
+  font-weight: 900;
   border-radius: 10px;
-  border: 1px solid #8ca3b4;
-  padding: 0.75rem 0.9rem;
-  font-size: 0.96rem;
-  font-family: inherit;
-  color: #11202f;
-  background-color: #fff;
+  padding: 0.2rem 0.58rem;
+  background: linear-gradient(145deg, #b10200 0%, #f12f19 100%);
 }
 
-input {
-  width: 100%;
+.hero {
+  padding: 2rem 1.2rem;
+  border-radius: 20px;
+  background: linear-gradient(160deg, rgba(32, 31, 31, 0.95), rgba(26, 26, 26, 0.92));
+  border: 1px solid rgba(96, 62, 57, 0.6);
+  box-shadow: 0 14px 42px rgba(0, 0, 0, 0.35);
 }
 
-button {
-  cursor: pointer;
-  transition: transform 120ms ease, filter 120ms ease;
+.hero h1 {
+  margin: 0;
+  font-family: "Manrope", sans-serif;
+  font-size: clamp(1.9rem, 5vw, 3.2rem);
+  letter-spacing: -1.6px;
 }
 
-.row {
+.hero p {
+  margin-top: 0.55rem;
+  color: #caada8;
+}
+
+.url-box,
+.folder-row {
+  margin-top: 1rem;
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 0.6rem;
 }
 
-.primary {
-  margin-top: 1rem;
-  width: 100%;
-  font-weight: 600;
-  border-color: #1f5e45;
-  background: #2f8f66;
-  color: #fff;
+.url-box input,
+.folder-row input,
+button {
+  border: 1px solid rgba(177, 135, 128, 0.35);
+  border-radius: 12px;
+  padding: 0.8rem 0.95rem;
+  font-size: 0.95rem;
+  font-family: inherit;
+  color: #f4e8e7;
+  background: #1d1d1d;
+}
+
+button {
+  cursor: pointer;
+  font-weight: 700;
+  transition: transform 120ms ease, filter 120ms ease;
 }
 
 button:hover {
-  filter: brightness(0.97);
   transform: translateY(-1px);
+  filter: brightness(1.03);
 }
 
-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.7;
-  transform: none;
+.btn-primary {
+  min-width: 170px;
+  border-color: rgba(255, 180, 168, 0.2);
+  background: linear-gradient(135deg, #ffb4a8 0%, #ff5540 100%);
+  color: #390000;
+}
+
+.download-card {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 20px;
+  border: 1px solid rgba(96, 62, 57, 0.6);
+  background: linear-gradient(160deg, rgba(32, 31, 31, 0.95), rgba(18, 18, 18, 0.92));
+}
+
+.download-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.download-header h2 {
+  margin: 0;
+  font-family: "Manrope", sans-serif;
+}
+
+.badge {
+  padding: 0.24rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #ffb4a8;
+  border: 1px solid rgba(255, 180, 168, 0.25);
+}
+
+.video-row {
+  margin-top: 0.8rem;
+  display: grid;
+  grid-template-columns: minmax(110px, 180px) 1fr;
+  gap: 0.8rem;
+}
+
+.video-thumb {
+  width: 100%;
+  height: 100%;
+  min-height: 102px;
+  max-height: 116px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid rgba(96, 62, 57, 0.6);
+}
+
+.video-thumb-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #b18780;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  background: #1d1d1d;
+}
+
+.video-info h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.video-info p {
+  margin: 0.34rem 0 0;
+  color: #caada8;
+}
+
+.progress-wrap {
+  margin-top: 1rem;
+}
+
+.progress-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: #caada8;
+}
+
+.progress-bar {
+  margin-top: 0.35rem;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ff5540, #ffb4a8);
+}
+
+.empty {
+  margin-top: 0.8rem;
+  color: #caada8;
 }
 
 .status {
   margin-top: 0.9rem;
-  color: #29435a;
+  font-size: 0.9rem;
+  color: #ebb3ab;
 }
-
 
 .error {
-  margin-top: 0.2rem;
-  color: #a22137;
-  font-weight: 600;
+  margin-top: 0.3rem;
+  font-size: 0.9rem;
+  color: #ff8f82;
+  font-weight: 700;
 }
 
-.metadata {
-  margin-top: 1rem;
-  padding: 0.8rem;
-  border-radius: 10px;
-  border: 1px solid #c5d4de;
-  background: #f5f9fc;
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.metadata h2 {
-  margin: 0 0 0.5rem;
-  font-size: 1.1rem;
-}
-
-@media (max-width: 640px) {
-  .row {
+@media (max-width: 760px) {
+  .url-box,
+  .folder-row,
+  .video-row {
     grid-template-columns: 1fr;
   }
 
-  .container {
-    padding: 1rem;
+  .btn-primary {
+    min-width: 0;
   }
 
-  .card {
-    padding: 1rem;
+  .app-root {
+    padding: 0.85rem;
   }
 }

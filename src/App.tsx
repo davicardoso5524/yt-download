@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import "./App.css";
@@ -19,6 +19,32 @@ function App() {
   const [error, setError] = useState("");
   const [metadata, setMetadata] = useState<VideoMetadata | null>(null);
   const [isValidating, setIsValidating] = useState(false);
+  const [splashVisible, setSplashVisible] = useState(true);
+  const [splashStep, setSplashStep] = useState(0);
+
+  const splashSteps = [
+    "Initializing engine...",
+    "Loading yt-dlp...",
+    "Checking ffmpeg...",
+    "Preparing interface...",
+    "Ready.",
+  ];
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setSplashStep((prev) => {
+        if (prev >= splashSteps.length - 1) {
+          window.clearInterval(timer);
+          window.setTimeout(() => setSplashVisible(false), 220);
+          return prev;
+        }
+
+        return prev + 1;
+      });
+    }, 420);
+
+    return () => window.clearInterval(timer);
+  }, []);
 
   const isUrlFormatValid = useMemo(() => {
     const value = url.trim().toLowerCase();
@@ -80,64 +106,113 @@ function App() {
     }
   }
 
+  const splashPct = Math.min(100, Math.round(((splashStep + 1) / splashSteps.length) * 100));
+
+  if (splashVisible) {
+    return (
+      <main className="splash-root">
+        <div className="splash-grid" />
+        <div className="splash-glow" />
+        <div className="splash-logo-wrap">
+          <span className="splash-logo-stark">STARK</span>
+          <span className="splash-logo-pill">TUBE</span>
+        </div>
+        <p className="splash-tagline">High Performance Extraction</p>
+        <div className="splash-loader-wrap">
+          <div className="splash-loader-bg">
+            <div className="splash-loader-fill" style={{ width: `${splashPct}%` }} />
+          </div>
+          <p className="splash-status">{splashSteps[splashStep]}</p>
+        </div>
+      </main>
+    );
+  }
+
   return (
-    <main className="container">
-      <section className="card">
-        <h1>YouTube Downloader</h1>
-        <p className="subtitle">Parte 1: validacao de URL e pasta de destino</p>
+    <main className="app-root">
+      <header className="topbar">
+        <div className="brand">
+          <span className="brand-stark">STARK</span>
+          <span className="brand-pill">TUBE</span>
+        </div>
+      </header>
 
-        <label htmlFor="url-input">URL do YouTube</label>
-        <input
-          id="url-input"
-          value={url}
-          onChange={(e) => setUrl(e.currentTarget.value)}
-          placeholder="https://www.youtube.com/watch?v=..."
-          autoComplete="off"
-        />
+      <section className="hero">
+        <h1>Ready to Extract</h1>
+        <p>Cole a URL, escolha a pasta e valide o video antes do download.</p>
 
-        <label htmlFor="destination-input">Pasta de destino</label>
-        <div className="row">
+        <div className="url-box">
+          <input
+            id="url-input"
+            value={url}
+            onChange={(e) => setUrl(e.currentTarget.value)}
+            placeholder="https://youtube.com/watch?v=..."
+            autoComplete="off"
+          />
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={isValidating}
+            onClick={validateUrl}
+          >
+            {isValidating ? "VALIDANDO" : "ANALISAR"}
+          </button>
+        </div>
+
+        <div className="folder-row">
           <input
             id="destination-input"
             value={destinationFolder}
             onChange={(e) => setDestinationFolder(e.currentTarget.value)}
-            placeholder="Selecione uma pasta..."
+            placeholder="Selecione a pasta de destino..."
             autoComplete="off"
           />
           <button type="button" onClick={pickFolder}>
             Escolher pasta
           </button>
         </div>
+      </section>
 
-        <button
-          type="button"
-          className="primary"
-          disabled={isValidating}
-          onClick={validateUrl}
-        >
-          {isValidating ? "Validando..." : "Validar URL"}
-        </button>
+      <section className="download-card">
+        <div className="download-header">
+          <h2>Download Atual</h2>
+          <span className="badge">PRE-CHECK</span>
+        </div>
+
+        {metadata ? (
+          <div className="video-row">
+            {metadata.thumbnail ? (
+              <img src={metadata.thumbnail} alt="Thumbnail do video" className="video-thumb" />
+            ) : (
+              <div className="video-thumb video-thumb-fallback">NO THUMB</div>
+            )}
+            <div className="video-info">
+              <h3>{metadata.title}</h3>
+              <p>{metadata.uploader ?? "Canal nao informado"}</p>
+              <p>
+                Duracao:{" "}
+                {metadata.durationSeconds
+                  ? `${Math.floor(metadata.durationSeconds / 60)}m ${metadata.durationSeconds % 60}s`
+                  : "Nao informada"}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <p className="empty">Nenhum video validado ainda.</p>
+        )}
+
+        <div className="progress-wrap">
+          <div className="progress-meta">
+            <span>Progresso</span>
+            <span>{metadata ? "0%" : "--"}</span>
+          </div>
+          <div className="progress-bar">
+            <div className="progress-fill" style={{ width: metadata ? "0%" : "0%" }} />
+          </div>
+        </div>
 
         <p className="status">Status: {status}</p>
         {error ? <p className="error">Erro: {error}</p> : null}
-
-        {metadata ? (
-          <div className="metadata">
-            <h2>Metadados do video</h2>
-            <p>
-              <strong>Titulo:</strong> {metadata.title}
-            </p>
-            <p>
-              <strong>Canal:</strong> {metadata.uploader ?? "Nao informado"}
-            </p>
-            <p>
-              <strong>Duracao:</strong>{" "}
-              {metadata.durationSeconds
-                ? `${Math.floor(metadata.durationSeconds / 60)}m ${metadata.durationSeconds % 60}s`
-                : "Nao informada"}
-            </p>
-          </div>
-        ) : null}
       </section>
     </main>
   );
