@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -25,6 +25,34 @@ type DownloadDoneEvent = {
 
 type MediaType = "video" | "audio";
 
+type DownloadHistoryStatus = "started" | "completed" | "failed";
+
+type DownloadHistoryEntry = {
+  id: string;
+  url: string;
+  title: string;
+  destinationFolder: string;
+  mediaType: MediaType;
+  format: string;
+  quality: string;
+  status: DownloadHistoryStatus;
+  percent: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+const HISTORY_STORAGE_KEY = "yt_download_history_v1";
+const HISTORY_LIMIT = 25;
+
+type DownloadConfig = {
+  url: string;
+  destinationFolder: string;
+  mediaType: MediaType;
+  format: string;
+  quality: string;
+  videoTitle: string;
+};
+
 function App() {
   const [url, setUrl] = useState("");
   const [destinationFolder, setDestinationFolder] = useState("");
@@ -40,8 +68,10 @@ function App() {
   const [audioFormat, setAudioFormat] = useState("mp3");
   const [videoQuality, setVideoQuality] = useState("1080");
   const [audioQuality, setAudioQuality] = useState("192");
+  const [historyEntries, setHistoryEntries] = useState<DownloadHistoryEntry[]>([]);
   const [splashVisible, setSplashVisible] = useState(true);
   const [splashStep, setSplashStep] = useState(0);
+  const activeHistoryIdRef = useRef<string | null>(null);
 
   const splashSteps = [
     "Initializing engine...",
@@ -68,16 +98,60 @@ function App() {
   }, []);
 
   useEffect(() => {
+    try {
+      const raw = localStorage.getItem(HISTORY_STORAGE_KEY);
+      if (!raw) {
+        return;
+      }
+
+      const parsed = JSON.parse(raw) as DownloadHistoryEntry[];
+      if (Array.isArray(parsed)) {
+        setHistoryEntries(parsed.slice(0, HISTORY_LIMIT));
+      }
+    } catch {
+      setHistoryEntries([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(historyEntries));
+    } catch {
+      // keep UI funcional mesmo se localStorage estiver indisponivel
+    }
+  }, [historyEntries]);
+
+  useEffect(() => {
     let disposeProgress: (() => void) | undefined;
     let disposeComplete: (() => void) | undefined;
     let disposeError: (() => void) | undefined;
 
+    const updateHistoryEntry = (
+      id: string,
+      updater: (entry: DownloadHistoryEntry) => DownloadHistoryEntry,
+    ) => {
+      setHistoryEntries((prev) => {
+        const next = prev.map((entry) => (entry.id === id ? updater(entry) : entry));
+        return next;
+      });
+    };
+
     const setupListeners = async () => {
       disposeProgress = await listen<DownloadProgressEvent>("download-progress", (event) => {
         setIsDownloading(true);
-        setDownloadPercent(Math.max(0, Math.min(100, Number(event.payload.percent) || 0)));
+        const percent = Math.max(0, Math.min(100, Number(event.payload.percent) || 0));
+        setDownloadPercent(percent);
         if (event.payload.videoTitle) {
           setDownloadTitle(event.payload.videoTitle);
+        }
+
+        if (activeHistoryIdRef.current) {
+          updateHistoryEntry(activeHistoryIdRef.current, (entry) => ({
+            ...entry,
+            title: event.payload.videoTitle || entry.title,
+            percent,
+            updatedAt: new Date().toISOString(),
+          }));
         }
       });
 
@@ -85,12 +159,31 @@ function App() {
         setIsDownloading(false);
         setDownloadPercent(100);
         setStatus(event.payload.message);
+
+        if (activeHistoryIdRef.current) {
+          updateHistoryEntry(activeHistoryIdRef.current, (entry) => ({
+            ...entry,
+            status: "completed",
+            percent: 100,
+            updatedAt: new Date().toISOString(),
+          }));
+          activeHistoryIdRef.current = null;
+        }
       });
 
       disposeError = await listen<DownloadDoneEvent>("download-error", (event) => {
         setIsDownloading(false);
         setError(event.payload.message);
         setStatus("Falha no download.");
+
+        if (activeHistoryIdRef.current) {
+          updateHistoryEntry(activeHistoryIdRef.current, (entry) => ({
+            ...entry,
+            status: "failed",
+            updatedAt: new Date().toISOString(),
+          }));
+          activeHistoryIdRef.current = null;
+        }
       });
     };
 
@@ -108,6 +201,16 @@ function App() {
       }
     };
   }, []);
+
+  function addHistoryEntry(entry: DownloadHistoryEntry) {
+    setHistoryEntries((prev) => [entry, ...prev].slice(0, HISTORY_LIMIT));
+  }
+
+  async function fetchMetadataFromUrl(nextUrl: string) {
+    return invoke<VideoMetadata>("fetch_video_metadata", {
+      url: nextUrl.trim(),
+    });
+  }
 
   const isUrlFormatValid = useMemo(() => {
     const value = url.trim().toLowerCase();
@@ -155,9 +258,7 @@ function App() {
     setStatus("Validando URL e buscando metadados...");
 
     try {
-      const result = await invoke<VideoMetadata>("fetch_video_metadata", {
-        url: url.trim(),
-      });
+      const result = await fetchMetadataFromUrl(url);
       setMetadata(result);
       setStatus("URL valida. Metadados carregados com sucesso.");
     } catch (err) {
@@ -167,6 +268,40 @@ function App() {
     } finally {
       setIsValidating(false);
     }
+  }
+
+  async function runDownload(config: DownloadConfig) {
+    const historyId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const now = new Date().toISOString();
+
+    addHistoryEntry({
+      id: historyId,
+      url: config.url,
+      title: config.videoTitle,
+      destinationFolder: config.destinationFolder,
+      mediaType: config.mediaType,
+      format: config.format,
+      quality: config.quality,
+      status: "started",
+      percent: 0,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    activeHistoryIdRef.current = historyId;
+    setDownloadPercent(0);
+    setDownloadTitle(config.videoTitle);
+    setIsDownloading(true);
+    setStatus("Iniciando download...");
+
+    await invoke("start_download", {
+      url: config.url,
+      destinationFolder: config.destinationFolder,
+      videoTitle: config.videoTitle,
+      mediaType: config.mediaType,
+      format: config.format,
+      quality: config.quality,
+    });
   }
 
   async function startDownload() {
@@ -182,13 +317,8 @@ function App() {
       return;
     }
 
-    setDownloadPercent(0);
-    setDownloadTitle(metadata.title);
-    setIsDownloading(true);
-    setStatus("Iniciando download...");
-
     try {
-      await invoke("start_download", {
+      await runDownload({
         url: url.trim(),
         destinationFolder: destinationFolder.trim(),
         videoTitle: metadata.title,
@@ -197,10 +327,67 @@ function App() {
         quality: mediaType === "video" ? videoQuality : audioQuality,
       });
     } catch (err) {
+      activeHistoryIdRef.current = null;
       setIsDownloading(false);
       const message = err instanceof Error ? err.message : String(err);
       setError(message);
       setStatus("Falha ao iniciar download.");
+    }
+  }
+
+  function applyHistoryEntry(entry: DownloadHistoryEntry) {
+    setUrl(entry.url);
+    setDestinationFolder(entry.destinationFolder);
+    setMediaType(entry.mediaType);
+
+    if (entry.mediaType === "video") {
+      setVideoFormat(entry.format);
+      setVideoQuality(entry.quality);
+    } else {
+      setAudioFormat(entry.format);
+      setAudioQuality(entry.quality);
+    }
+
+    setDownloadTitle(entry.title);
+    setDownloadPercent(entry.percent);
+    setStatus("Configuracao carregada do historico.");
+  }
+
+  async function redownloadFromHistory(entry: DownloadHistoryEntry) {
+    if (isDownloading) {
+      return;
+    }
+
+    applyHistoryEntry(entry);
+    setError("");
+    setStatus("Revalidando item do historico...");
+
+    try {
+      const result = await fetchMetadataFromUrl(entry.url);
+      setMetadata(result);
+
+      await runDownload({
+        url: entry.url,
+        destinationFolder: entry.destinationFolder,
+        mediaType: entry.mediaType,
+        format: entry.format,
+        quality: entry.quality,
+        videoTitle: result.title,
+      });
+    } catch (err) {
+      activeHistoryIdRef.current = null;
+      setIsDownloading(false);
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+      setStatus("Falha ao repetir download do historico.");
+    }
+  }
+
+  function formatHistoryTime(value: string) {
+    try {
+      return new Date(value).toLocaleString("pt-BR");
+    } catch {
+      return value;
     }
   }
 
@@ -397,6 +584,56 @@ function App() {
           {mediaType === "video" ? `${videoQuality}p` : `${audioQuality} kbps`}
         </p>
         {error ? <p className="error">Erro: {error}</p> : null}
+      </section>
+
+      <section className="history-card">
+        <div className="download-header">
+          <h2>Historico de Downloads</h2>
+          <span className="badge">{historyEntries.length} ITEM(NS)</span>
+        </div>
+
+        {historyEntries.length === 0 ? (
+          <p className="empty">Nenhum download salvo ainda.</p>
+        ) : (
+          <div className="history-list">
+            {historyEntries.map((entry) => (
+              <article key={entry.id} className="history-item">
+                <div className="history-item-top">
+                  <h3>{entry.title}</h3>
+                  <span className={`status-chip status-${entry.status}`}>
+                    {entry.status === "completed"
+                      ? "Concluido"
+                      : entry.status === "failed"
+                        ? "Falhou"
+                        : "Em andamento"}
+                  </span>
+                </div>
+
+                <p className="history-meta">{entry.url}</p>
+                <p className="history-meta">
+                  {entry.mediaType === "video" ? "Video" : "Audio"} / {entry.format.toUpperCase()} /{" "}
+                  {entry.mediaType === "video" ? `${entry.quality}p` : `${entry.quality} kbps`}
+                </p>
+                <p className="history-meta">Destino: {entry.destinationFolder}</p>
+                <p className="history-meta">Atualizado em: {formatHistoryTime(entry.updatedAt)}</p>
+
+                <div className="history-actions">
+                  <button type="button" onClick={() => applyHistoryEntry(entry)} disabled={isDownloading}>
+                    Usar configuracao
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={() => redownloadFromHistory(entry)}
+                    disabled={isDownloading}
+                  >
+                    Baixar novamente
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
     </main>
   );

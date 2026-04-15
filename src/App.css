@@ -235,6 +235,79 @@ button:hover {
   background: linear-gradient(160deg, rgba(32, 31, 31, 0.95), rgba(18, 18, 18, 0.92));
 }
 
+.history-card {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 20px;
+  border: 1px solid rgba(96, 62, 57, 0.6);
+  background: linear-gradient(160deg, rgba(32, 31, 31, 0.95), rgba(18, 18, 18, 0.92));
+}
+
+.history-list {
+  margin-top: 0.8rem;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.history-item {
+  border: 1px solid rgba(177, 135, 128, 0.25);
+  border-radius: 12px;
+  padding: 0.8rem;
+  background: rgba(27, 27, 27, 0.9);
+}
+
+.history-item-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.history-item-top h3 {
+  margin: 0;
+  font-size: 0.98rem;
+}
+
+.history-meta {
+  margin: 0.3rem 0 0;
+  font-size: 0.8rem;
+  color: #caada8;
+  word-break: break-word;
+}
+
+.status-chip {
+  border-radius: 999px;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.status-completed {
+  color: #9be2bc;
+  border: 1px solid rgba(155, 226, 188, 0.35);
+}
+
+.status-failed {
+  color: #ff8f82;
+  border: 1px solid rgba(255, 143, 130, 0.35);
+}
+
+.status-started {
+  color: #ffca9b;
+  border: 1px solid rgba(255, 202, 155, 0.35);
+}
+
+.history-actions {
+  margin-top: 0.7rem;
+  display: flex;
+  gap: 0.6rem;
+}
+
+.history-actions button {
+  flex: 1;
+}
+
 .download-header {
   display: flex;
   justify-content: space-between;
@@ -359,6 +432,10 @@ button:hover {
   .options-grid,
   .video-row {
     grid-template-columns: 1fr;
+  }
+
+  .history-actions {
+    flex-direction: column;
   }
 
   .btn-primary {
