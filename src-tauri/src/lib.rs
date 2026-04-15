@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
@@ -23,7 +23,7 @@ struct ProcessOutput {
     stderr: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct RawYtDlpJson {
     id: Option<String>,
@@ -73,17 +73,17 @@ fn candidate_paths(tool_name: &str) -> Vec<PathBuf> {
         candidates.push(cwd.join("bin").join(&executable));
     }
 
-    if let Ok(exe_path) = std::env::current_exe()
-        && let Some(exe_dir) = exe_path.parent()
-    {
-        candidates.push(
-            exe_dir
-                .join("tools")
-                .join("bin")
-                .join("windows")
-                .join(&executable),
-        );
-        candidates.push(exe_dir.join(&executable));
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            candidates.push(
+                exe_dir
+                    .join("tools")
+                    .join("bin")
+                    .join("windows")
+                    .join(&executable),
+            );
+            candidates.push(exe_dir.join(&executable));
+        }
     }
 
     candidates
@@ -146,6 +146,56 @@ fn extract_title_from_destination(line: &str) -> Option<String> {
     Some(file_name.to_string())
 }
 
+fn normalize_video_format(input: &str) -> String {
+    match input.to_ascii_lowercase().as_str() {
+        "mp4" | "mkv" | "webm" => input.to_ascii_lowercase(),
+        _ => "mp4".to_string(),
+    }
+}
+
+fn normalize_audio_format(input: &str) -> String {
+    match input.to_ascii_lowercase().as_str() {
+        "mp3" | "m4a" | "opus" => input.to_ascii_lowercase(),
+        _ => "mp3".to_string(),
+    }
+}
+
+fn normalize_video_quality(input: &str) -> u32 {
+    match input {
+        "2160" => 2160,
+        "1440" => 1440,
+        "1080" => 1080,
+        "720" => 720,
+        "480" => 480,
+        "360" => 360,
+        "240" => 240,
+        "144" => 144,
+        _ => 1080,
+    }
+}
+
+fn normalize_audio_quality(input: &str) -> u32 {
+    match input {
+        "320" => 320,
+        "256" => 256,
+        "192" => 192,
+        "128" => 128,
+        "64" => 64,
+        _ => 192,
+    }
+}
+
+fn build_video_selector(max_height: u32) -> String {
+    format!(
+        "bestvideo[height<={0}]+bestaudio/best[height<={0}]/best",
+        max_height
+    )
+}
+
+fn build_audio_selector(max_bitrate: u32) -> String {
+    format!("bestaudio[abr<={0}]/bestaudio", max_bitrate)
+}
+
 #[tauri::command]
 async fn fetch_video_metadata(url: String) -> Result<VideoMetadata, String> {
     if !is_valid_youtube_url(&url) {
@@ -199,6 +249,9 @@ async fn start_download(
     url: String,
     destination_folder: String,
     video_title: Option<String>,
+    media_type: String,
+    format: String,
+    quality: String,
 ) -> Result<(), String> {
     if !is_valid_youtube_url(&url) {
         return Err("URL invalida: informe um link do YouTube (youtube.com ou youtu.be).".to_string());
@@ -221,6 +274,9 @@ async fn start_download(
     let url_clone = url.clone();
     let destination_clone = destination.to_string();
     let expected_title = video_title.unwrap_or_else(|| "Video em download".to_string());
+    let media_type_normalized = media_type.to_ascii_lowercase();
+    let format_value = format;
+    let quality_value = quality;
 
     tauri::async_runtime::spawn(async move {
         let app_for_emit = app_handle.clone();
@@ -229,10 +285,6 @@ async fn start_download(
             command
                 .arg("--newline")
                 .arg("--no-playlist")
-                .arg("-f")
-                .arg("bestvideo*+bestaudio/best")
-                .arg("--merge-output-format")
-                .arg("mp4")
                 .arg("-P")
                 .arg(&destination_clone)
                 .arg("-o")
@@ -240,6 +292,29 @@ async fn start_download(
                 .arg(&url_clone)
                 .stdout(Stdio::null())
                 .stderr(Stdio::piped());
+
+            if media_type_normalized == "audio" {
+                let selected_format = normalize_audio_format(&format_value);
+                let selected_quality = normalize_audio_quality(&quality_value);
+                let selector = build_audio_selector(selected_quality);
+
+                command
+                    .arg("-f")
+                    .arg(selector)
+                    .arg("-x")
+                    .arg("--audio-format")
+                    .arg(selected_format);
+            } else {
+                let selected_format = normalize_video_format(&format_value);
+                let selected_quality = normalize_video_quality(&quality_value);
+                let selector = build_video_selector(selected_quality);
+
+                command
+                    .arg("-f")
+                    .arg(selector)
+                    .arg("--merge-output-format")
+                    .arg(selected_format);
+            }
 
             if let Some(ffmpeg_dir) = ffmpeg_location {
                 command.arg("--ffmpeg-location").arg(ffmpeg_dir);

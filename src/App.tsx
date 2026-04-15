@@ -23,6 +23,8 @@ type DownloadDoneEvent = {
   message: string;
 };
 
+type MediaType = "video" | "audio";
+
 function App() {
   const [url, setUrl] = useState("");
   const [destinationFolder, setDestinationFolder] = useState("");
@@ -33,6 +35,11 @@ function App() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadPercent, setDownloadPercent] = useState(0);
   const [downloadTitle, setDownloadTitle] = useState("");
+  const [mediaType, setMediaType] = useState<MediaType>("video");
+  const [videoFormat, setVideoFormat] = useState("mp4");
+  const [audioFormat, setAudioFormat] = useState("mp3");
+  const [videoQuality, setVideoQuality] = useState("1080");
+  const [audioQuality, setAudioQuality] = useState("192");
   const [splashVisible, setSplashVisible] = useState(true);
   const [splashStep, setSplashStep] = useState(0);
 
@@ -185,6 +192,9 @@ function App() {
         url: url.trim(),
         destinationFolder: destinationFolder.trim(),
         videoTitle: metadata.title,
+        mediaType,
+        format: mediaType === "video" ? videoFormat : audioFormat,
+        quality: mediaType === "video" ? videoQuality : audioQuality,
       });
     } catch (err) {
       setIsDownloading(false);
@@ -259,6 +269,85 @@ function App() {
             Escolher pasta
           </button>
         </div>
+
+        <div className="options-grid">
+          <label>
+            Tipo
+            <select
+              value={mediaType}
+              onChange={(event) => setMediaType(event.currentTarget.value as MediaType)}
+              disabled={isDownloading}
+            >
+              <option value="video">Video</option>
+              <option value="audio">Somente audio</option>
+            </select>
+          </label>
+
+          {mediaType === "video" ? (
+            <>
+              <label>
+                Formato
+                <select
+                  value={videoFormat}
+                  onChange={(event) => setVideoFormat(event.currentTarget.value)}
+                  disabled={isDownloading}
+                >
+                  <option value="mp4">MP4</option>
+                  <option value="mkv">MKV</option>
+                  <option value="webm">WEBM</option>
+                </select>
+              </label>
+
+              <label>
+                Qualidade
+                <select
+                  value={videoQuality}
+                  onChange={(event) => setVideoQuality(event.currentTarget.value)}
+                  disabled={isDownloading}
+                >
+                  <option value="2160">4K</option>
+                  <option value="1440">1440p</option>
+                  <option value="1080">1080p</option>
+                  <option value="720">720p</option>
+                  <option value="480">480p</option>
+                  <option value="360">360p</option>
+                  <option value="240">240p</option>
+                  <option value="144">144p</option>
+                </select>
+              </label>
+            </>
+          ) : (
+            <>
+              <label>
+                Formato
+                <select
+                  value={audioFormat}
+                  onChange={(event) => setAudioFormat(event.currentTarget.value)}
+                  disabled={isDownloading}
+                >
+                  <option value="mp3">MP3</option>
+                  <option value="m4a">M4A</option>
+                  <option value="opus">OPUS</option>
+                </select>
+              </label>
+
+              <label>
+                Qualidade
+                <select
+                  value={audioQuality}
+                  onChange={(event) => setAudioQuality(event.currentTarget.value)}
+                  disabled={isDownloading}
+                >
+                  <option value="320">320 kbps</option>
+                  <option value="256">256 kbps</option>
+                  <option value="192">192 kbps</option>
+                  <option value="128">128 kbps</option>
+                  <option value="64">64 kbps</option>
+                </select>
+              </label>
+            </>
+          )}
+        </div>
       </section>
 
       <section className="download-card">
@@ -302,6 +391,11 @@ function App() {
         </button>
 
         <p className="status">Status: {status}</p>
+        <p className="status">
+          Configuracao: {mediaType === "video" ? "Video" : "Audio"} /{" "}
+          {mediaType === "video" ? videoFormat.toUpperCase() : audioFormat.toUpperCase()} /{" "}
+          {mediaType === "video" ? `${videoQuality}p` : `${audioQuality} kbps`}
+        </p>
         {error ? <p className="error">Erro: {error}</p> : null}
       </section>
     </main>

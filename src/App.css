@@ -179,6 +179,7 @@ body {
 
 .url-box input,
 .folder-row input,
+select,
 button {
   border: 1px solid rgba(177, 135, 128, 0.35);
   border-radius: 12px;
@@ -187,6 +188,25 @@ button {
   font-family: inherit;
   color: #f4e8e7;
   background: #1d1d1d;
+}
+
+.options-grid {
+  margin-top: 0.9rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.options-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.84rem;
+  color: #e8c2bb;
+}
+
+.options-grid select {
+  width: 100%;
 }
 
 button {
@@ -336,6 +356,7 @@ button:hover {
 @media (max-width: 760px) {
   .url-box,
   .folder-row,
+  .options-grid,
   .video-row {
     grid-template-columns: 1fr;
   }
