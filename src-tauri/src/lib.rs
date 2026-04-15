@@ -1,6 +1,9 @@
 use serde::Serialize;
+use std::fs;
+use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Stdio};
+use tauri::{AppHandle, Emitter};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -29,6 +32,20 @@ struct RawYtDlpJson {
     duration: Option<u64>,
     webpage_url: Option<String>,
     thumbnail: Option<String>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct DownloadProgressEvent {
+    video_title: String,
+    percent: f64,
+    raw_line: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct DownloadDoneEvent {
+    message: String,
 }
 
 fn is_valid_youtube_url(url: &str) -> bool {
@@ -105,6 +122,30 @@ fn resolve_executable(tool_name: &str) -> Result<String, String> {
     ))
 }
 
+fn extract_percent(line: &str) -> Option<f64> {
+    let percent_idx = line.find('%')?;
+    let before = &line[..percent_idx];
+    let start = before
+        .rfind(|c: char| !(c.is_ascii_digit() || c == '.'))
+        .map_or(0, |idx| idx + 1);
+    let number = before.get(start..)?.trim();
+    number.parse::<f64>().ok()
+}
+
+fn extract_title_from_destination(line: &str) -> Option<String> {
+    let marker = "[download] Destination:";
+    if !line.contains(marker) {
+        return None;
+    }
+
+    let file_name = line.split(marker).nth(1)?.trim();
+    if file_name.is_empty() {
+        return None;
+    }
+
+    Some(file_name.to_string())
+}
+
 #[tauri::command]
 async fn fetch_video_metadata(url: String) -> Result<VideoMetadata, String> {
     if !is_valid_youtube_url(&url) {
@@ -152,12 +193,136 @@ async fn fetch_video_metadata(url: String) -> Result<VideoMetadata, String> {
     })
 }
 
+#[tauri::command]
+async fn start_download(
+    app: AppHandle,
+    url: String,
+    destination_folder: String,
+    video_title: Option<String>,
+) -> Result<(), String> {
+    if !is_valid_youtube_url(&url) {
+        return Err("URL invalida: informe um link do YouTube (youtube.com ou youtu.be).".to_string());
+    }
+
+    let destination = destination_folder.trim();
+    if destination.is_empty() {
+        return Err("Selecione uma pasta de destino antes de iniciar o download.".to_string());
+    }
+
+    fs::create_dir_all(destination)
+        .map_err(|err| format!("Nao foi possivel preparar pasta de destino: {}", err))?;
+
+    let yt_dlp = resolve_executable("yt-dlp")?;
+    let ffmpeg_location = resolve_executable("ffmpeg")
+        .ok()
+        .and_then(|path| PathBuf::from(path).parent().map(|p| p.to_path_buf()));
+
+    let app_handle = app.clone();
+    let url_clone = url.clone();
+    let destination_clone = destination.to_string();
+    let expected_title = video_title.unwrap_or_else(|| "Video em download".to_string());
+
+    tauri::async_runtime::spawn(async move {
+        let app_for_emit = app_handle.clone();
+        let result = tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
+            let mut command = Command::new(&yt_dlp);
+            command
+                .arg("--newline")
+                .arg("--no-playlist")
+                .arg("-f")
+                .arg("bestvideo*+bestaudio/best")
+                .arg("--merge-output-format")
+                .arg("mp4")
+                .arg("-P")
+                .arg(&destination_clone)
+                .arg("-o")
+                .arg("%(title).200B [%(id)s].%(ext)s")
+                .arg(&url_clone)
+                .stdout(Stdio::null())
+                .stderr(Stdio::piped());
+
+            if let Some(ffmpeg_dir) = ffmpeg_location {
+                command.arg("--ffmpeg-location").arg(ffmpeg_dir);
+            }
+
+            let mut child = command
+                .spawn()
+                .map_err(|err| format!("Falha ao iniciar yt-dlp: {}", err))?;
+
+            let stderr = child
+                .stderr
+                .take()
+                .ok_or_else(|| "Nao foi possivel capturar logs do yt-dlp.".to_string())?;
+
+            let mut current_title = expected_title;
+
+            for line in BufReader::new(stderr).lines() {
+                let line = line.map_err(|err| format!("Erro ao ler progresso: {}", err))?;
+
+                if let Some(found) = extract_title_from_destination(&line) {
+                    current_title = found;
+                }
+
+                if let Some(percent) = extract_percent(&line) {
+                    let payload = DownloadProgressEvent {
+                        video_title: current_title.clone(),
+                        percent,
+                        raw_line: line.clone(),
+                    };
+
+                    let _ = app_for_emit.emit("download-progress", payload);
+                }
+            }
+
+            let status = child
+                .wait()
+                .map_err(|err| format!("Falha ao aguardar processo de download: {}", err))?;
+
+            if status.success() {
+                Ok(())
+            } else {
+                Err("yt-dlp finalizou com erro durante o download.".to_string())
+            }
+        })
+        .await;
+
+        match result {
+            Ok(Ok(())) => {
+                let _ = app_handle.emit(
+                    "download-complete",
+                    DownloadDoneEvent {
+                        message: "Download finalizado com sucesso.".to_string(),
+                    },
+                );
+            }
+            Ok(Err(err)) => {
+                let _ = app_handle.emit(
+                    "download-error",
+                    DownloadDoneEvent {
+                        message: err,
+                    },
+                );
+            }
+            Err(join_err) => {
+                let _ = app_handle.emit(
+                    "download-error",
+                    DownloadDoneEvent {
+                        message: format!("Falha na task de download: {}", join_err),
+                    },
+                );
+            }
+        }
+    });
+
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![fetch_video_metadata])
+        .invoke_handler(tauri::generate_handler![fetch_video_metadata, start_download])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
