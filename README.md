@@ -1,10 +1,10 @@
-# Stark Tube v2.0.0
+# Stark Tube v4.0.0
 
-[![Release](https://img.shields.io/badge/release-2.0.0-success?style=for-the-badge)](https://github.com/davicardoso5524/yt-download/releases)
+[![Release](https://img.shields.io/badge/release-4.0.0-success?style=for-the-badge)](https://github.com/davicardoso5524/yt-download/releases)
 
 ## Baixar Agora
 
-[![Download Stark Tube](https://img.shields.io/badge/Download-Stark%20Tube%202.0.0-red?style=for-the-badge&logo=windows)](https://github.com/davicardoso5524/yt-download/releases)
+[![Download Stark Tube](https://img.shields.io/badge/Download-Stark%20Tube%204.0.0-red?style=for-the-badge&logo=windows)](https://github.com/davicardoso5524/yt-download/releases)
 
 Aplicativo desktop para baixar videos e playlists do YouTube com interface moderna em React + Vite e backend local com Tauri (Rust).
 
